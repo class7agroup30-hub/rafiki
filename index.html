@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#14532d"><link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png">
+<title>Rafiki Staff Group</title>
+<style>
+:root{--g:#14532d;--g2:#166534;--gold:#d4a017;--bg:#f3f6f4;--ink:#1c2b22;--mut:#6b7c72;--red:#b91c1c}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:linear-gradient(135deg,var(--g),#0f3d22);color:#fff;padding:14px 18px;border-bottom:4px solid var(--gold)}
+header a{color:#fff;text-decoration:none;font-weight:800;letter-spacing:.06em}header small{display:block;font-weight:400;letter-spacing:0;opacity:.8;font-size:.72rem}
+main{max-width:980px;margin:0 auto;padding:14px}
+.card{background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+h2{margin:0 0 10px;color:var(--g);font-size:1.05rem}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px}
+.stat{background:#fff;border-radius:14px;padding:10px 12px;border-left:5px solid var(--gold);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.stat span{display:block;color:var(--mut);font-size:.72rem;text-transform:uppercase}.stat b{font-size:1.15rem;color:var(--g)}
+.members{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.m{display:block;text-decoration:none;color:inherit;background:#fff;border-radius:14px;padding:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);border-top:4px solid var(--g2)}
+.m .n{font-weight:700}.m .s{color:var(--mut);font-size:.82rem;margin-top:3px}
+.tag{display:inline-block;padding:2px 9px;border-radius:99px;font-size:.72rem;font-weight:600;margin:6px 4px 0 0}
+.ok{background:#dcfce7;color:#166534}.no{background:#fef3c7;color:#92400e}.loan{background:#fee2e2;color:var(--red)}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+input,select{padding:10px;border:1px solid #cbd5d0;border-radius:10px;font-size:1rem;background:#fff;min-width:0}
+button,.btn{background:var(--g);color:#fff;border:0;border-radius:10px;padding:10px 14px;font-size:.92rem;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block}
+.gold{background:var(--gold);color:#241a00}.grey{background:#64748b}.sm{padding:6px 10px;font-size:.8rem}
+button.x{background:none;color:var(--red);padding:2px 8px}
+table{width:100%;border-collapse:collapse;font-size:.9rem}th{background:var(--g);color:#fff;text-align:left;padding:7px}
+td{padding:7px;border-bottom:1px solid #e5ece8}.num{text-align:right}tfoot td{font-weight:700;background:#ecfdf5}
+.scroll{overflow-x:auto}.loanbox{border:1px solid #d9e3dd;border-radius:12px;padding:10px;margin-bottom:10px}
+.hint{font-size:.82rem;color:var(--mut);margin-top:6px}.printhead{display:none}
+@media print{@page{size:A4;margin:10mm}body{background:#fff;font-size:11px}header,.noprint{display:none!important}
+main{padding:0;max-width:none}.card,.stat{box-shadow:none;border:1px solid #ccc;padding:8px;margin-bottom:8px;break-inside:avoid}
+.printhead{display:block;text-align:center;border-bottom:3px solid var(--gold);margin-bottom:8px}.printhead h1{margin:0;color:var(--g);font-size:18px}
+td,th{padding:4px 6px}th{background:var(--g)!important;color:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style></head><body>
+<header><a href="#/">RAFIKI STAFF GROUP<small>Contributions &amp; Loans</small></a></header>
+<main id="app"></main>
+<script src="jspdf.min.js"></script>
+<script>
+const MONTHLY=250000,START='2026-12',END='2027-12',RATE=10,KEY='rafiki_v1',GROUP='RAFIKI STAFF GROUP';
+let DB;try{DB=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!DB||!DB.members)DB={members:[],next:1};
+DB.start=DB.start||START;DB.end=DB.end||END;
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(DB))}catch(e){alert('Could not save! Storage is full or blocked.')}};
+const $=s=>document.querySelector(s),get=id=>DB.members.find(m=>m.id==id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=c=>'KSh '+(c%100===0?(c/100).toLocaleString('en-US'):(c/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}));
+const dt=s=>new Date(s).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true});
+const mname=m=>{const[y,n]=m.split('-');return new Date(y,n-1,1).toLocaleDateString('en-GB',{month:'long',year:'numeric'})};
+const pad=n=>String(n).padStart(2,'0'),nowM=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)};
+const months=()=>{const o=[];let[y,m]=DB.start.split('-').map(Number);while(y+'-'+pad(m)<=DB.end){o.push(y+'-'+pad(m));m==12?(y++,m=1):m++}return o};
+const cents=v=>Math.round(parseFloat(v)*100);
+// ---- loan: 10% of the OUTSTANDING balance added at start of each month (amounts in cents)
+function addMonths(d,n){const r=new Date(d.getFullYear(),d.getMonth()+n,1,d.getHours(),d.getMinutes(),d.getSeconds());
+ r.setDate(Math.min(d.getDate(),new Date(r.getFullYear(),r.getMonth()+1,0).getDate()));return r}
+function loanFig(l,now=new Date()){
+ // Each month 10% of EVERYTHING STILL OWED (loan left + unpaid interest) is charged as interest. A payment clears interest first, the rest reduces the loan.
+ const iss=new Date(l.issued_at);let full=(now.getFullYear()-iss.getFullYear())*12+now.getMonth()-iss.getMonth();
+ if(now.getDate()<iss.getDate())full--;full=Math.max(0,full);
+ const reps=[...l.repayments].sort((a,b)=>new Date(a.paid_at)-new Date(b.paid_at));
+ let prin=l.principal,due=0,paidInt=0,tInt=0,k=0;const rows=[];
+ const apply=(r,row)=>{const x=Math.min(r.amount,due),p=Math.min(prin,r.amount-x);due-=x;paidInt+=x;prin-=p;
+  if(row){row.paid+=r.amount;row.toInt+=x;row.toPrin+=p}};
+ for(let i=0;i<=full;i++){const w=addMonths(iss,i);
+  while(k<reps.length&&new Date(reps[k].paid_at)<=w){apply(reps[k],rows[rows.length-1]);k++}
+  if(rows.length){const p=rows[rows.length-1];p.close=prin;p.owing=due}
+  const x=Math.round((prin+due)*RATE/100);due+=x;tInt+=x;
+  rows.push({m:w,open:prin,chg:x,paid:0,toInt:0,toPrin:0,close:prin,owing:due,last:i==full})}
+ while(k<reps.length){apply(reps[k],rows[rows.length-1]);k++}
+ const lr=rows[rows.length-1];lr.close=prin;lr.owing=due;
+ return{n:full+1,int:tInt,paidInt,due,prin,total:l.principal+tInt,paid:reps.reduce((s,r)=>s+r.amount,0),bal:prin+due,
+  rows,next:addMonths(iss,full+1),nextInt:Math.round((prin+due)*RATE/100),reps}}
+const stat=r=>r.open==0&&r.chg==0?'Cleared':r.paid==0?(r.last?'Due':'MISSED'):r.owing>0?'Partial':'Paid';
+const mshort=d=>d.toLocaleDateString('en-GB',{month:'short',year:'numeric'}),nf=c=>money(c).slice(4);
+const sc=s=>s=='Paid'||s=='Cleared'?'ok':s=='MISSED'?'loan':'no';
+const sched=f=>`<div class="scroll"><table style="font-size:.8rem"><thead><tr><th>Month</th><th class="num">Loan at start</th><th class="num">Interest</th><th class="num">Paid</th><th class="num">To interest</th><th class="num">To loan</th><th class="num">Loan left</th><th class="num">Interest owing</th><th>Status</th></tr></thead><tbody>`+
+ f.rows.map(r=>{const s=stat(r);return `<tr><td>${mshort(r.m)}</td><td class="num">${nf(r.open)}</td><td class="num">${nf(r.chg)}</td><td class="num">${nf(r.paid)}</td><td class="num">${nf(r.toInt)}</td><td class="num">${nf(r.toPrin)}</td><td class="num">${nf(r.close)}</td><td class="num">${nf(r.owing)}</td><td><span class="tag ${sc(s)}" style="margin:0">${s}</span></td></tr>`}).join('')+`</tbody></table></div>`;
+// ---- end-of-year take-home: contributions + 50% of own interest paid + equal share of the other 50% of everyone's interest
+function payoutData(){
+ const N=DB.members.length,rows=DB.members.map(m=>{const fs=m.loans.map(l=>loanFig(l)),pi=fs.reduce((s,f)=>s+f.paidInt,0),own=Math.floor(pi/2);
+  return{m,c:m.contribs.reduce((s,x)=>s+x.amount,0),pi,own,pool:pi-own,owed:fs.reduce((s,f)=>s+f.bal,0)}});
+ if(N<2)rows.forEach(r=>{r.own=r.pi;r.pool=0});
+ const pool=rows.reduce((s,r)=>s+r.pool,0);
+ rows.forEach(r=>{r.share=N>1?Math.round((pool-r.pool)/(N-1)):0;r.take=r.c+r.own+r.share;r.net=r.take-r.owed});
+ return{rows,pool,N,tc:rows.reduce((s,r)=>s+r.c,0),ti:rows.reduce((s,r)=>s+r.pi,0)}}
+function payoutView(){const p=payoutData(),S=(a,b)=>`<div class="stat"><span>${a}</span><b>${b}</b></div>`;
+ return `<div class="row noprint"><a class="btn grey" href="#/">← Members</a><button class="gold" onclick="window.print()">🖨 Print</button><button onclick="payoutPdf()">⬇ Download PDF</button></div>
+ <div class="printhead"><h1>${GROUP}</h1><div>Take-home if the group is dissolved today | ${dt(new Date())}</div></div>
+ <div class="stats">${S('Total contributions',money(p.tc))}${S('Interest paid so far',money(p.ti))}${S('Interest shared (50%)',money(p.pool))}${S('This year',mname(DB.start)+' – '+mname(DB.end))}</div>
+ <div class="card"><h2>Take-home if the group is dissolved today</h2><div class="scroll"><table><thead><tr><th>Member</th><th class="num">Contributions</th><th class="num">Own 50% interest</th><th class="num">Share from others' interest</th><th class="num">Take-home</th><th class="num">Loan still owed</th><th class="num">Net after loan</th></tr></thead><tbody>
+ ${p.rows.map(r=>`<tr><td><a href="#/m/${r.m.id}">${esc(r.m.name)}</a></td><td class="num">${money(r.c)}</td><td class="num">${money(r.own)}</td><td class="num">${money(r.share)}</td><td class="num"><b>${money(r.take)}</b></td><td class="num">${money(r.owed)}</td><td class="num">${money(r.net)}</td></tr>`).join('')||'<tr><td colspan="7">No members yet.</td></tr>'}
+ </tbody></table></div><div class="hint">Take-home = monthly contributions + 50% of the interest the member paid + an equal share of the other 50% of every OTHER member's interest (a borrower does not share in their own 50%). Only interest actually paid counts. “Net after loan” shows what is left if the loan still owed is cleared from the take-home.</div></div>
+ <div class="card noprint"><h2>End of year</h2><div class="hint" style="margin:0 0 10px">When the group has been dissolved and everyone is paid, start a new year. All contributions, loans and repayments are cleared; members stay on the list. A backup file of this year is downloaded first (also save the payout PDF above).</div><button style="background:var(--red)" onclick="resetYear()">🔄 Close this year &amp; start a new year</button></div>`}
+// ---- views
+function home(){
+ const cur=nowM(),inP=months().includes(cur);let tot=0,owed=0;
+ const cards=DB.members.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(m=>{
+  const t=m.contribs.reduce((s,c)=>s+c.amount,0),b=m.loans.reduce((s,l)=>s+loanFig(l).bal,0),p=m.contribs.some(c=>c.month==cur);tot+=t;owed+=b;
+  return `<a class="m" href="#/m/${m.id}" data-n="${esc(m.name.toLowerCase())}"><div class="n">${esc(m.name)}</div><div class="s">Saved: ${money(t)}</div>`+
+  (inP?`<span class="tag ${p?'ok':'no'}">${p?'Paid this month':'Not paid this month'}</span>`:'')+(b?`<span class="tag loan">Loan: ${money(b)}</span>`:'')+`</a>`}).join('');
+ return `<div class="stats"><div class="stat"><span>Members</span><b>${DB.members.length}</b></div><div class="stat"><span>Total contributions</span><b>${money(tot)}</b></div>
+ <div class="stat"><span>Loans outstanding</span><b>${money(owed)}</b></div><div class="stat"><span>Monthly share</span><b>${money(MONTHLY)}</b></div></div>
+ <div class="row"><a class="btn gold" href="#/payout">💰 Take-home / payout report</a></div>
+ <div class="card"><h2>Add member</h2><div class="row"><input id="nn" placeholder="Full name" style="flex:2;min-width:150px"><input id="np" placeholder="Phone (optional)" style="flex:1;min-width:120px"><button onclick="addMember()">+ Add</button></div></div>
+ <div class="card"><h2>Members</h2><input placeholder="Search name..." style="width:100%;margin-bottom:10px" oninput="q(this.value)">
+ <div class="members" id="list">${cards||'<p style="color:var(--mut)">No members yet. Add the first one above.</p>'}</div></div>
+ <div class="card"><h2>Backup</h2><div class="row"><button class="grey" onclick="backup()">⬇ Save backup file</button>
+ <label class="btn grey">⬆ Restore / import<input type="file" accept=".json" hidden onchange="restore(this)"></label></div>
+ <div class="hint">Your records are saved on this phone. Save a backup file now and then, and before clearing browser data.</div></div>`}
+function member(id){
+ const m=get(id);if(!m)return '<p>Not found. <a href="#/">Back</a></p>';
+ const cs=m.contribs.slice().sort((a,b)=>a.month<b.month?-1:1),tc=cs.reduce((s,c)=>s+c.amount,0),paid=new Set(cs.map(c=>c.month)),opts=months().filter(x=>!paid.has(x));
+ const ls=m.loans.map(l=>({l,f:loanFig(l)})).sort((a,b)=>b.l.issued_at.localeCompare(a.l.issued_at)),owe=ls.reduce((s,x)=>s+x.f.bal,0),po=payoutData().rows.find(r=>r.m.id==id);
+ return `<div class="row noprint"><a class="btn grey" href="#/">← Members</a><button class="gold" onclick="window.print()">🖨 Print</button><button onclick="pdf(${id})">⬇ Download PDF</button></div>
+ <div class="printhead"><h1>${GROUP}</h1><div>Member Contribution &amp; Loan Record | Printed ${dt(new Date())}</div></div>
+ <div class="card"><h2 style="font-size:1.35rem">${esc(m.name)}</h2><div style="color:var(--mut)">Phone: ${esc(m.phone)||'-'} • Joined: ${dt(m.joined)}</div></div>
+ <div class="stats"><div class="stat"><span>Total contributed</span><b>${money(tc)}</b></div><div class="stat"><span>Loan balance</span><b style="color:${owe?'var(--red)':'var(--g)'}">${money(owe)}</b></div>
+ <div class="stat"><span>Take-home if group ends today</span><b>${money(po.take)}</b><div class="hint">Contributions ${money(po.c)} + own interest ${money(po.own)} + share of others' interest ${money(po.share)}</div></div></div>
+ <div class="card"><h2>Monthly contributions (${money(MONTHLY)} / month)</h2>
+ ${opts.length?`<div class="row noprint"><select id="cm">${opts.map(x=>`<option value="${x}">${mname(x)}</option>`).join('')}</select><button onclick="contribute(${id})">Record ${money(MONTHLY)} paid now</button></div>`:''}
+ <div class="scroll"><table><thead><tr><th>Month</th><th class="num">Amount</th><th>Date &amp; time paid</th><th class="noprint"></th></tr></thead><tbody>
+ ${cs.map(c=>`<tr><td>${mname(c.month)}</td><td class="num">${money(c.amount)}</td><td>${dt(c.paid_at)}</td><td class="noprint"><button class="x" onclick="delContrib(${id},'${c.month}')">✕</button></td></tr>`).join('')||'<tr><td colspan="4" style="color:var(--mut)">No contributions recorded yet.</td></tr>'}
+ </tbody><tfoot><tr><td>TOTAL</td><td class="num">${money(tc)}</td><td colspan="2"></td></tr></tfoot></table></div></div>
+ <div class="card"><h2>Loans (${RATE}% interest per month on the amount still owed)</h2><div class="hint" style="margin:-4px 0 8px">Each payment clears the interest first; the rest reduces the loan. Unpaid interest also attracts interest.</div>
+ <div class="row noprint"><input id="la" type="number" min="1" placeholder="Loan amount (KSh)"><button onclick="giveLoan(${id})">Give loan</button></div>
+ ${ls.map(({l,f})=>{const ms=f.rows.filter(r=>stat(r)=='MISSED').map(r=>mshort(r.m));return `<div class="loanbox"><div class="scroll"><table><thead><tr><th>Issued</th><th class="num">Loan given</th><th class="num">Interest charged</th><th class="num">Interest paid</th><th class="num">Loan left</th><th class="num">Interest owing</th><th class="num">Total to pay</th></tr></thead>
+ <tbody><tr><td>${dt(l.issued_at)}</td><td class="num">${money(l.principal)}</td><td class="num">${money(f.int)}</td><td class="num">${money(f.paidInt)}</td><td class="num">${money(f.prin)}</td><td class="num">${money(f.due)}</td>
+ <td class="num"><b style="color:${f.bal?'var(--red)':'var(--g)'}">${money(f.bal)}</b></td></tr></tbody></table></div>
+ ${ms.length?`<div class="tag loan" style="margin:8px 0 0">⚠ No payment in: ${ms.join(', ')} — the interest keeps adding up</div>`:''}
+ <div style="margin-top:8px">${sched(f)}</div>
+ ${f.reps.length?`<div style="margin-top:6px;font-size:.88rem"><b>Repayments:</b>${f.reps.map(r=>`<div>${dt(r.paid_at)} — ${money(r.amount)}</div>`).join('')}</div>`:''}
+ ${f.bal?`<div class="hint">Next interest of about ${money(f.nextInt)} (10% of the amount owed) is added on ${dt(f.next)}. Paying before then lowers it.</div>
+ <div class="row noprint" style="margin-top:8px"><input id="r${l.id}" type="number" min="1" step="any" placeholder="Repayment (KSh)"><button class="sm" onclick="repay(${id},${l.id})">Record repayment</button></div>`:'<span class="tag ok">Fully repaid</span>'}</div>`}).join('')||'<p style="color:var(--mut)">No loans issued to this member.</p>'}</div>`}
+// ---- actions
+function render(){const h=location.hash.match(/^#\/m\/(\d+)/);$('#app').innerHTML=location.hash=='#/payout'?payoutView():h?member(h[1]):home();window.scrollTo(0,0)}
+const q=v=>{v=v.toLowerCase();document.querySelectorAll('#list .m').forEach(e=>e.style.display=e.dataset.n.includes(v)?'':'none')};
+function addMember(){const n=$('#nn').value.trim();if(!n)return alert('Enter a name');
+ if(DB.members.some(m=>m.name.toLowerCase()==n.toLowerCase()))return alert('That member already exists');
+ DB.members.push({id:DB.next++,name:n,phone:$('#np').value.trim(),joined:new Date().toISOString(),contribs:[],loans:[]});save();render()}
+function contribute(id){const m=get(id),mo=$('#cm').value;if(!mo||m.contribs.some(c=>c.month==mo))return;
+ m.contribs.push({month:mo,amount:MONTHLY,paid_at:new Date().toISOString()});save();render()}
+function delContrib(id,mo){if(!confirm('Remove this contribution?'))return;const m=get(id);m.contribs=m.contribs.filter(c=>c.month!=mo);save();render()}
+function giveLoan(id){const a=cents($('#la').value);if(!(a>0))return alert('Enter a valid loan amount');
+ get(id).loans.push({id:DB.next++,principal:a,issued_at:new Date().toISOString(),repayments:[]});save();render()}
+function repay(id,lid){const a=cents($('#r'+lid).value);if(!(a>0))return alert('Enter a valid amount');
+ get(id).loans.find(l=>l.id==lid).repayments.push({amount:a,paid_at:new Date().toISOString()});save();render()}
+function resetYear(){
+ if(!confirm('Close this year and start a new one?\n\nThis DELETES all contributions, loans and repayments. Members stay on the list.\nA backup file of this year will be downloaded first.\n\nHave you saved the payout PDF?'))return;
+ if((prompt('Type RESET to confirm')||'').trim().toUpperCase()!=='RESET')return alert('Cancelled. Nothing was changed.');
+ const ns=prompt('First month of the new year (YYYY-MM)',DB.end)||'';
+ if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(ns))return alert('Cancelled: the month must look like 2027-12. Nothing was changed.');
+ backup();DB.members.forEach(m=>{m.contribs=[];m.loans=[]});
+ const[y,mo]=ns.split('-').map(Number);DB.start=ns;DB.end=(y+1)+'-'+pad(mo);save();location.hash='#/';render();
+ alert('New year started: '+mname(DB.start)+' to '+mname(DB.end))}
+function backup(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(DB)],{type:'application/json'}));
+ a.download='rafiki_backup_'+new Date().toISOString().slice(0,10)+'.json';a.click()}
+function restore(inp){const f=inp.files[0];if(!f)return;f.text().then(t=>{try{const d=JSON.parse(t);if(!Array.isArray(d.members))throw 0;
+ if(!confirm('Replace ALL current records with this file?'))return;
+ d.next=d.next||1+Math.max(0,...d.members.flatMap(m=>[m.id,...m.loans.map(l=>l.id)]));DB=d;DB.start=DB.start||START;DB.end=DB.end||END;save();render()}catch(e){alert('That is not a valid backup file')}})}
+function PD(){const d=new jspdf.jsPDF({unit:'mm',format:'a4'}),G=[20,83,45];let y=16;const T=(s,x,o)=>d.text(String(s),x,y,o);
+ const row=(c,w,al,bold,fill)=>{if(y>275){d.addPage();y=15}let x=14;if(fill){d.setFillColor(...fill);d.rect(14,y-4.8,182,7,'F')}d.setFont('helvetica',bold?'bold':'normal');
+  c.forEach((v,i)=>{al[i]=='r'?T(v,x+w[i]-2,{align:'right'}):T(v,x+2);x+=w[i]});d.setDrawColor(210);d.line(14,y+2.3,196,y+2.3);y+=7};
+ const table=(head,rows,w,al,foot,fs=8.5)=>{d.setFontSize(fs);d.setTextColor(255);row(head,w,al,1,G);d.setTextColor(0);rows.forEach(r=>row(r,w,al));if(foot)row(foot,w,al,1,[236,253,245]);y+=3};
+ const h=s=>{d.setFont('helvetica','bold');d.setFontSize(11);d.setTextColor(...G);y+=3;T(s,14);y+=6;d.setTextColor(0)};
+ const line=(s,b)=>{d.setFont('helvetica',b?'bold':'normal');d.setFontSize(9.5);d.setTextColor(0);T(s,14);y+=5.5};
+ const title=s=>{d.setFont('helvetica','bold');d.setFontSize(18);d.setTextColor(...G);T(GROUP,105,{align:'center'});y+=6;d.setFont('helvetica','normal');d.setFontSize(10);d.setTextColor(0);T(s,105,{align:'center'});y+=9};
+ return{d,table,h,line,title,Y:v=>v==null?y:(y+=v)}}
+function pdf(id){const m=get(id),P=PD(),po=payoutData().rows.find(r=>r.m.id==id);
+ P.title('Member Contribution & Loan Record');P.line('Member: '+m.name,1);P.line('Phone: '+(m.phone||'-')+'   Joined: '+dt(m.joined)+'   Printed: '+dt(new Date()));P.Y(3);
+ const cs=m.contribs.slice().sort((a,b)=>a.month<b.month?-1:1);P.h('Monthly Contributions ('+money(MONTHLY)+' per month)');
+ P.table(['Month','Amount','Date & time paid'],cs.map(c=>[mname(c.month),money(c.amount),dt(c.paid_at)]),[60,40,82],['l','r','l'],['TOTAL',money(po.c),'']);
+ P.h('Loans (interest '+RATE+'% per month on the amount owed; payments clear interest first)');
+ if(!m.loans.length)P.line('No loans issued.');
+ m.loans.forEach(l=>{const f=loanFig(l),ms=f.rows.filter(r=>stat(r)=='MISSED').map(r=>mshort(r.m));
+  P.line('Loan of '+money(l.principal)+' given '+dt(l.issued_at)+'  |  To pay now: '+money(f.bal)+' (loan '+money(f.prin)+' + interest '+money(f.due)+')',1);
+  if(ms.length)P.line('NO PAYMENT IN: '+ms.join(', ')+' - interest keeps adding up');
+  const S=k=>f.rows.reduce((s,r)=>s+r[k],0);
+  P.table(['Month','Loan at start','Interest','Paid','To interest','To loan','Loan left','Int. owing','Status'],f.rows.map(r=>[mshort(r.m),nf(r.open),nf(r.chg),nf(r.paid),nf(r.toInt),nf(r.toPrin),nf(r.close),nf(r.owing),stat(r)]),
+   [22,22,20,20,20,20,22,20,16],['l','r','r','r','r','r','r','r','l'],['Total','',nf(S('chg')),nf(S('paid')),nf(S('toInt')),nf(S('toPrin')),'',nf(f.due),''],7.5)});
+ P.h('Take-home if the group is dissolved today');
+ P.table(['Contributions','Own 50% interest','Pool share','Take-home','Loan owed','Net after loan'],[[money(po.c),money(po.own),money(po.share),money(po.take),money(po.owed),money(po.net)]],[30,32,28,30,30,32],['r','r','r','r','r','r']);
+ if(P.Y()>262)P.d.addPage(),P.Y(-P.Y()+20);P.Y(8);P.line('Treasurer signature: ______________________     Date: ______________');
+ P.d.save('Rafiki_'+m.name.replace(/[^a-z0-9]+/gi,'_')+'_record.pdf')}
+function payoutPdf(){const p=payoutData(),P=PD();P.title('Take-home if the group is dissolved today  -  '+dt(new Date()));
+ P.line('Total contributions '+money(p.tc)+'  |  Interest paid '+money(p.ti)+'  |  Shared pool '+money(p.pool)+'  |  Year '+mname(DB.start)+' - '+mname(DB.end));P.Y(3);
+ P.table(['Member','Contributions','Own 50% int.','Pool share','Take-home','Loan owed','Net after loan'],p.rows.map(r=>[r.m.name,nf(r.c),nf(r.own),nf(r.share),nf(r.take),nf(r.owed),nf(r.net)]),[44,24,24,22,24,22,22],['l','r','r','r','r','r','r'],null,8);
+ P.Y(2);P.line('Take-home = contributions + 50% of own interest paid + equal share of the other 50% of every OTHER member\'s interest.');
+ P.d.save('Rafiki_payout_report.pdf')}
+window.onhashchange=render;render();
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
+</script></body></html>
