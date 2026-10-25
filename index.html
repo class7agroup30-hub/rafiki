@@ -112,7 +112,7 @@ function member(id){
  const m=get(id);if(!m)return '<p>Not found. <a href="#/">Back</a></p>';
  const cs=m.contribs.slice().sort((a,b)=>a.month<b.month?-1:1),tc=cs.reduce((s,c)=>s+c.amount,0),paid=new Set(cs.map(c=>c.month)),opts=months().filter(x=>!paid.has(x));
  const ls=m.loans.map(l=>({l,f:loanFig(l)})).sort((a,b)=>b.l.issued_at.localeCompare(a.l.issued_at)),owe=ls.reduce((s,x)=>s+x.f.bal,0),po=payoutData().rows.find(r=>r.m.id==id);
- return `<div class="row noprint"><a class="btn grey" href="#/">← Members</a><button class="gold" onclick="window.print()">🖨 Print</button><button onclick="pdf(${id})">⬇ Download PDF</button></div>
+ return `<div class="row noprint"><a class="btn grey" href="#/">← Members</a><button class="gold" onclick="window.print()">🖨 Print</button><button onclick="pdf(${id})">⬇ Download PDF</button><button style="background:var(--red)" onclick="delMember(${id})">🗑 Delete member</button></div>
  <div class="printhead"><h1>${GROUP}</h1><div>Member Contribution &amp; Loan Record | Printed ${dt(new Date())}</div></div>
  <div class="card"><h2 style="font-size:1.35rem">${esc(m.name)}</h2><div style="color:var(--mut)">Phone: ${esc(m.phone)||'-'} • Joined: ${dt(m.joined)}</div></div>
  <div class="stats"><div class="stat"><span>Total contributed</span><b>${money(tc)}</b></div><div class="stat"><span>Loan balance</span><b style="color:${owe?'var(--red)':'var(--g)'}">${money(owe)}</b></div>
@@ -145,6 +145,11 @@ function giveLoan(id){const a=cents($('#la').value);if(!(a>0))return alert('Ente
  get(id).loans.push({id:DB.next++,principal:a,issued_at:new Date().toISOString(),repayments:[]});save();render()}
 function repay(id,lid){const a=cents($('#r'+lid).value);if(!(a>0))return alert('Enter a valid amount');
  get(id).loans.find(l=>l.id==lid).repayments.push({amount:a,paid_at:new Date().toISOString()});save();render()}
+function delMember(id){
+ const m=get(id),owe=m.loans.reduce((s,l)=>s+loanFig(l).bal,0),tc=m.contribs.reduce((s,c)=>s+c.amount,0);
+ if(!confirm('Delete '+m.name+'?\n\nThis permanently removes their '+m.contribs.length+' contribution(s) ('+money(tc)+') and '+m.loans.length+' loan(s)'+(owe?' (they still owe '+money(owe)+')':'')+'.\n\nTip: save a backup first (Backup, on the home page).'))return;
+ if((prompt('Type DELETE to confirm')||'').trim().toUpperCase()!=='DELETE')return alert('Cancelled. Nothing was deleted.');
+ DB.members=DB.members.filter(x=>x.id!=id);save();location.hash='#/';render()}
 function resetYear(){
  if(!confirm('Close this year and start a new one?\n\nThis DELETES all contributions, loans and repayments. Members stay on the list.\nA backup file of this year will be downloaded first.\n\nHave you saved the payout PDF?'))return;
  if((prompt('Type RESET to confirm')||'').trim().toUpperCase()!=='RESET')return alert('Cancelled. Nothing was changed.');
@@ -181,12 +186,19 @@ function pdf(id){const m=get(id),P=PD(),po=payoutData().rows.find(r=>r.m.id==id)
  P.h('Take-home if the group is dissolved today');
  P.table(['Contributions','Own 50% interest','Pool share','Take-home','Loan owed','Net after loan'],[[money(po.c),money(po.own),money(po.share),money(po.take),money(po.owed),money(po.net)]],[30,32,28,30,30,32],['r','r','r','r','r','r']);
  if(P.Y()>262)P.d.addPage(),P.Y(-P.Y()+20);P.Y(8);P.line('Treasurer signature: ______________________     Date: ______________');
- P.d.save('Rafiki_'+m.name.replace(/[^a-z0-9]+/gi,'_')+'_record.pdf')}
+ savePDF(P.d,'Rafiki_'+m.name.replace(/[^a-z0-9]+/gi,'_')+'_record.pdf')}
 function payoutPdf(){const p=payoutData(),P=PD();P.title('Take-home if the group is dissolved today  -  '+dt(new Date()));
  P.line('Total contributions '+money(p.tc)+'  |  Interest paid '+money(p.ti)+'  |  Shared pool '+money(p.pool)+'  |  Year '+mname(DB.start)+' - '+mname(DB.end));P.Y(3);
  P.table(['Member','Contributions','Own 50% int.','Pool share','Take-home','Loan owed','Net after loan'],p.rows.map(r=>[r.m.name,nf(r.c),nf(r.own),nf(r.share),nf(r.take),nf(r.owed),nf(r.net)]),[44,24,24,22,24,22,22],['l','r','r','r','r','r','r'],null,8);
  P.Y(2);P.line('Take-home = contributions + 50% of own interest paid + equal share of the other 50% of every OTHER member\'s interest.');
- P.d.save('Rafiki_payout_report.pdf')}
+ savePDF(P.d,'Rafiki_payout_report.pdf')}
+function savePDF(d,name){
+ try{const u=URL.createObjectURL(d.output('blob')),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),60000)}
+ catch(e){try{d.save(name)}catch(e2){alert('Could not save the PDF: '+e2.message+'\nUse Print and choose "Save as PDF" instead.')}}}
+const safePDF=f=>(...a)=>{
+ if(!window.jspdf){if(confirm('The PDF tool did not load (file jspdf.min.js is missing or not cached yet).\n\nOpen the Print screen instead? Choose "Save as PDF" as the printer.'))window.print();return}
+ try{f(...a)}catch(e){alert('PDF error: '+e.message+'\nUse Print and choose "Save as PDF" instead.')}};
+pdf=safePDF(pdf);payoutPdf=safePDF(payoutPdf);
 window.onhashchange=render;render();
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
